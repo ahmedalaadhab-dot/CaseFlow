@@ -4,6 +4,7 @@ dist/
 .env.local
 .env.*
 !.env.example
+!caseflow-frontend/.env.production
 *.log
 uploads/*
 !uploads/.gitkeep
