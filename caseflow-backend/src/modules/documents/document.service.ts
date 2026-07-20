@@ -71,6 +71,7 @@ export const documentService = {
     const doc = await documentRepository.findById(id);
     if (!doc) throw new NotFoundError("Document");
     await documentRepository.softDelete(id);
+    await storage.delete(doc.storageKey);
     await caseRepository.addTimelineEvent({
       caseId: doc.caseId,
       actorId,
