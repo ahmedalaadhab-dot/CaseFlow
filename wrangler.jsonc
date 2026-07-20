@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "caseflow",
+  "compatibility_date": "2026-07-20",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "caseflow-frontend"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
