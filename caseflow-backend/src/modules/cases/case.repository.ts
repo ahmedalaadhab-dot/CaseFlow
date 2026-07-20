@@ -11,6 +11,9 @@ const caseListInclude = {
 
 const caseDetailInclude = {
   ...caseListInclude,
+  // Wider than the list select — invoices need CPR/passport/address for
+  // the Bill To section.
+  customer: { select: { id: true, fullName: true, phone: true, cpr: true, passportNumber: true, address: true } },
   caseStages: { orderBy: { order: "asc" as const }, include: { checklistItems: true } },
   documents: { where: { deletedAt: null }, orderBy: { createdAt: "desc" as const } },
   tasks: { orderBy: { deadline: "asc" as const } },

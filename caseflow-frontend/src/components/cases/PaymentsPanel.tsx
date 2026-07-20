@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, Receipt } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,6 @@ const METHODS = [
 export function PaymentsPanel({ caseData }: { caseData: Case }) {
   const [amount, setAmount] = React.useState("");
   const [method, setMethod] = React.useState("cash");
-  const [invoiceNumber, setInvoiceNumber] = React.useState("");
   const createPayment = useCreatePayment();
   const { toast } = useToast();
 
@@ -32,10 +32,9 @@ export function PaymentsPanel({ caseData }: { caseData: Case }) {
     const amt = Number(amount);
     if (!amt || amt <= 0) return;
     try {
-      await createPayment.mutateAsync({ caseId: caseData.id, amount: amt, method, invoiceNumber: invoiceNumber || undefined });
+      await createPayment.mutateAsync({ caseId: caseData.id, amount: amt, method });
       toast({ title: "Payment recorded", variant: "success" });
       setAmount("");
-      setInvoiceNumber("");
     } catch (err) {
       toast({ title: "Couldn't record payment", description: getApiErrorMessage(err), variant: "destructive" });
     }
@@ -77,7 +76,6 @@ export function PaymentsPanel({ caseData }: { caseData: Case }) {
               ))}
             </SelectContent>
           </Select>
-          <Input placeholder="Invoice #" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} className="sm:w-32" />
           <Button onClick={onAdd} isLoading={createPayment.isPending}>
             <Plus className="h-4 w-4" /> Record
           </Button>
@@ -93,7 +91,17 @@ export function PaymentsPanel({ caseData }: { caseData: Case }) {
                   {p.method.replace(/_/g, " ")} {p.invoiceNumber && `· Inv #${p.invoiceNumber}`}
                 </p>
               </div>
-              <span className="text-xs text-muted-foreground">{formatDate(p.paidAt ?? p.createdAt)}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">{formatDate(p.paidAt ?? p.createdAt)}</span>
+                <Link
+                  to={`/cases/${caseData.id}/payments/${p.id}/invoice`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-accent hover:underline"
+                >
+                  <Receipt className="h-3.5 w-3.5" /> Invoice
+                </Link>
+              </div>
             </div>
           ))}
         </div>

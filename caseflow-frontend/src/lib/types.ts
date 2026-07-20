@@ -209,6 +209,16 @@ export interface Case {
   updatedAt: string;
 }
 
+export interface OfficeInfo {
+  name: string;
+  phone: string;
+  address: string;
+  // Not settable from the UI yet (deliberately deferred) — the invoice
+  // template already renders these if/when they show up in the setting.
+  crNumber?: string;
+  logoUrl?: string;
+}
+
 export interface PaginatedMeta {
   page: number;
   pageSize: number;

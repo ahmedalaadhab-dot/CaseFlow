@@ -18,13 +18,8 @@ import { useServiceTemplates, useSetServiceTemplateActive, useDeleteServiceTempl
 import { useUsers, useDeactivateUser, useReactivateUser } from "@/hooks/useUsers";
 import { ServiceTemplateFormDialog } from "@/components/settings/ServiceTemplateFormDialog";
 import { CreateUserDialog, EditUserDialog, ResetPasswordDialog } from "@/components/settings/UserFormDialog";
-import type { ServiceTemplate, StaffUser } from "@/lib/types";
+import type { ServiceTemplate, StaffUser, OfficeInfo } from "@/lib/types";
 
-interface OfficeInfo {
-  name: string;
-  phone: string;
-  address: string;
-}
 interface WorkingHours {
   open: string;
   close: string;

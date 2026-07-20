@@ -9,7 +9,17 @@ import type {
   Task,
   Payment,
   SearchResults,
+  OfficeInfo,
 } from "@/lib/types";
+
+// Read-only — Settings -> Office info is the only place that writes this.
+export function useOfficeInfo() {
+  return useQuery({
+    queryKey: ["settings"],
+    queryFn: () => unwrap<Record<string, unknown>>(api.get("/settings")),
+    select: (data) => (data?.office_info as OfficeInfo) ?? null,
+  });
+}
 
 export function useServiceTemplates(activeOnly = true) {
   return useQuery({
@@ -127,8 +137,7 @@ export function useUpdateTask() {
 export function useCreatePayment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { caseId: string; amount: number; method: string; invoiceNumber?: string }) =>
-      unwrap<Payment>(api.post("/payments", data)),
+    mutationFn: (data: { caseId: string; amount: number; method: string }) => unwrap<Payment>(api.post("/payments", data)),
     onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["cases", vars.caseId] }),
   });
 }

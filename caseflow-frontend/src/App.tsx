@@ -18,6 +18,7 @@ import CalendarPage from "@/pages/Calendar";
 import ArchivePage from "@/pages/Archive";
 import ReportsPage from "@/pages/Reports";
 import SettingsPage from "@/pages/Settings";
+import InvoicePage from "@/pages/invoices/InvoicePage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPasswordPage />} />
 
               <Route element={<ProtectedRoute />}>
+                <Route path="/cases/:caseId/payments/:paymentId/invoice" element={<InvoicePage />} />
                 <Route element={<AppShell />}>
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/cases" element={<CasesListPage />} />
