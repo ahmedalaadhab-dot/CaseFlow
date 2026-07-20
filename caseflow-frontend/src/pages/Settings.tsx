@@ -37,7 +37,14 @@ function useSetting<T>(key: string, fallback: T) {
     queryKey: ["settings"],
     queryFn: () => unwrap<Record<string, unknown>>(api.get("/settings")),
   });
-  const value = (data?.[key] as T) ?? fallback;
+  // Callers pass fallback as an inline object literal, which is a new
+  // reference on every render. Pinning it in a ref (read once, never
+  // updated) keeps `value` referentially stable across renders when the
+  // setting has never been saved — otherwise a `useEffect` synced to
+  // `value` re-fires every render, permanently resetting any in-progress
+  // edit before the user can finish typing.
+  const fallbackRef = React.useRef(fallback);
+  const value = (data?.[key] as T) ?? fallbackRef.current;
 
   const save = useMutation({
     mutationFn: (v: T) => api.put("/settings", { key, value: v }),
@@ -75,8 +82,12 @@ function OfficeInfoTab() {
         <Button
           isLoading={save.isPending}
           onClick={async () => {
-            await save.mutateAsync(form);
-            toast({ title: "Office information saved", variant: "success" });
+            try {
+              await save.mutateAsync(form);
+              toast({ title: "Office information saved", variant: "success" });
+            } catch (err) {
+              toast({ title: "Couldn't save office information", description: getApiErrorMessage(err), variant: "destructive" });
+            }
           }}
         >
           Save changes
@@ -116,8 +127,12 @@ function WorkingHoursTab() {
         <Button
           isLoading={save.isPending}
           onClick={async () => {
-            await save.mutateAsync(form);
-            toast({ title: "Working hours saved", variant: "success" });
+            try {
+              await save.mutateAsync(form);
+              toast({ title: "Working hours saved", variant: "success" });
+            } catch (err) {
+              toast({ title: "Couldn't save working hours", description: getApiErrorMessage(err), variant: "destructive" });
+            }
           }}
         >
           Save changes
