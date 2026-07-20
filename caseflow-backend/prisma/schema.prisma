@@ -1,0 +1,469 @@
+// CaseFlow — Prisma schema
+// Clean, normalized relational design for a government-services case
+// management system. Soft deletes are implemented via `deletedAt` on
+// entities that need an audit trail / recoverability; hard deletes are
+// fine for purely transactional child rows (timeline events, audit logs).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  OWNER
+  MANAGER
+  EMPLOYEE
+  RECEPTION
+  VIEWER
+}
+
+enum CaseStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_FOR_CLIENT
+  WAITING_FOR_GOVERNMENT
+  WAITING_FOR_PAYMENT
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  REFUNDED
+}
+
+enum DocumentCategory {
+  PASSPORT
+  CPR
+  PHOTOS
+  MEDICAL
+  CONTRACTS
+  INVOICES
+  GOVERNMENT_FORMS
+  OTHER
+}
+
+enum NotificationType {
+  CASE_ASSIGNED
+  DUE_DATE_APPROACHING
+  CHECKLIST_INCOMPLETE
+  TASK_ASSIGNED
+  CASE_OVERDUE
+  DOCUMENT_MISSING
+  PAYMENT_PENDING
+}
+
+// ============================================================
+// USERS & AUTH
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String
+  lastName      String
+  role          Role      @default(EMPLOYEE)
+  isActive      Boolean   @default(true)
+  avatarUrl     String?
+  lastLoginAt   DateTime?
+
+  refreshTokens    RefreshToken[]
+  passwordResets   PasswordResetToken[]
+
+  assignedCases    Case[]              @relation("AssignedEmployee")
+  createdCases     Case[]              @relation("CreatedByUser")
+  tasks            Task[]              @relation("TaskAssignee")
+  timelineEvents   TimelineEvent[]     @relation("TimelineActor")
+  notifications    Notification[]      @relation("NotificationRecipient")
+  auditLogs        AuditLog[]          @relation("AuditActor")
+  pinnedCases       PinnedCase[]
+  favoriteCustomers FavoriteCustomer[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([role])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ============================================================
+// CUSTOMERS
+// ============================================================
+
+model Customer {
+  id              String    @id @default(cuid())
+  fullName        String
+  nationality     String?
+  cpr             String?   @unique
+  passportNumber  String?
+  gender          String?
+  dateOfBirth     DateTime?
+  phone           String?
+  whatsapp        String?
+  email           String?
+  address         String?
+  employer        String?
+  notes           String?
+  profilePicture  String?
+
+  cases       Case[]
+  favoritedBy FavoriteCustomer[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([fullName])
+  @@index([cpr])
+  @@index([passportNumber])
+  @@index([phone])
+}
+
+model FavoriteCustomer {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, customerId])
+}
+
+// ============================================================
+// SERVICE TEMPLATES & WORKFLOW STAGES
+// ============================================================
+
+model ServiceTemplate {
+  id                    String   @id @default(cuid())
+  name                  String
+  description           String?
+  estimatedDays         Int?
+  defaultPriority       Priority @default(NORMAL)
+  isActive              Boolean  @default(true)
+
+  templateStages TemplateStage[]
+  cases          Case[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([name])
+}
+
+model TemplateStage {
+  id                String          @id @default(cuid())
+  serviceTemplateId String
+  serviceTemplate   ServiceTemplate @relation(fields: [serviceTemplateId], references: [id], onDelete: Cascade)
+  name              String
+  order             Int
+  color             String?         @default("#1e3a5f")
+
+  checklistItems     TemplateChecklistItem[]
+  requiredDocuments  TemplateRequiredDocument[]
+  caseStages         CaseStage[]
+
+  @@index([serviceTemplateId, order])
+}
+
+model TemplateChecklistItem {
+  id              String        @id @default(cuid())
+  templateStageId String
+  templateStage   TemplateStage @relation(fields: [templateStageId], references: [id], onDelete: Cascade)
+  label           String
+  isMandatory     Boolean       @default(true)
+  order           Int           @default(0)
+}
+
+model TemplateRequiredDocument {
+  id              String           @id @default(cuid())
+  templateStageId String
+  templateStage   TemplateStage    @relation(fields: [templateStageId], references: [id], onDelete: Cascade)
+  category        DocumentCategory
+  label           String
+  isMandatory     Boolean          @default(true)
+}
+
+// ============================================================
+// CASES
+// ============================================================
+
+model Case {
+  id                       String        @id @default(cuid())
+  caseNumber               String        @unique // auto-generated e.g. CF-2026-000123
+
+  customerId               String
+  customer                 Customer      @relation(fields: [customerId], references: [id])
+
+  assignedEmployeeId       String?
+  assignedEmployee         User?         @relation("AssignedEmployee", fields: [assignedEmployeeId], references: [id])
+
+  createdByUserId          String
+  createdByUser            User          @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+
+  serviceTemplateId        String
+  serviceTemplate          ServiceTemplate @relation(fields: [serviceTemplateId], references: [id])
+
+  currentCaseStageId       String?
+  currentCaseStage         CaseStage?    @relation("CurrentStage", fields: [currentCaseStageId], references: [id])
+
+  priority                 Priority      @default(NORMAL)
+  status                   CaseStatus    @default(NEW)
+
+  dueDate                  DateTime?
+  description              String?
+  internalNotes            String?
+
+  governmentReferenceNumber String?
+  governmentTrackingNumber  String?
+
+  paymentStatus            PaymentStatus @default(UNPAID)
+  caseCost                  Decimal?      @db.Decimal(10, 3) // BHD uses 3 decimal places
+  customerPrice             Decimal?      @db.Decimal(10, 3)
+  // profit is derived (customerPrice - caseCost) and computed in the service layer,
+  // not stored, to avoid drift between stored/derived values.
+
+  isArchived                Boolean       @default(false)
+  archivedAt                DateTime?
+
+  caseStages     CaseStage[]      @relation("CaseStagesOnCase")
+  documents      Document[]
+  tasks          Task[]
+  timelineEvents TimelineEvent[]
+  payments       Payment[]
+  pinnedBy       PinnedCase[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([priority])
+  @@index([assignedEmployeeId])
+  @@index([customerId])
+  @@index([dueDate])
+  @@index([isArchived])
+  @@index([caseNumber])
+}
+
+// A per-case copy of the template's stages, so editing a template later
+// doesn't retroactively change history on cases already using it.
+model CaseStage {
+  id              String   @id @default(cuid())
+  caseId          String
+  case            Case     @relation("CaseStagesOnCase", fields: [caseId], references: [id], onDelete: Cascade)
+  templateStageId String?
+  templateStage   TemplateStage? @relation(fields: [templateStageId], references: [id])
+
+  name            String
+  order           Int
+  color           String?
+  enteredAt       DateTime?
+  completedAt     DateTime?
+
+  checklistItems  CaseChecklistItem[]
+  currentOnCases  Case[]   @relation("CurrentStage")
+
+  @@index([caseId, order])
+}
+
+model CaseChecklistItem {
+  id          String    @id @default(cuid())
+  caseStageId String
+  caseStage   CaseStage @relation(fields: [caseStageId], references: [id], onDelete: Cascade)
+  label       String
+  isMandatory Boolean   @default(true)
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  order       Int       @default(0)
+}
+
+model PinnedCase {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, caseId])
+}
+
+// ============================================================
+// DOCUMENTS
+// ============================================================
+
+model Document {
+  id          String           @id @default(cuid())
+  caseId      String
+  case        Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  category    DocumentCategory
+  fileName    String
+  storageKey  String           // abstracted storage path/key (local path or future S3 key)
+  mimeType    String
+  sizeBytes   Int
+  version     Int              @default(1)
+  replacesId  String?          // points to the previous version's Document.id
+
+  uploadedByUserId String
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  @@index([caseId])
+  @@index([category])
+}
+
+// ============================================================
+// TASKS
+// ============================================================
+
+model Task {
+  id            String    @id @default(cuid())
+  caseId        String
+  case          Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  assignedUserId String?
+  assignedUser  User?     @relation("TaskAssignee", fields: [assignedUserId], references: [id])
+  deadline      DateTime?
+  priority      Priority  @default(NORMAL)
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([caseId])
+  @@index([assignedUserId])
+  @@index([deadline])
+}
+
+// ============================================================
+// TIMELINE / AUDIT
+// ============================================================
+
+model TimelineEvent {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorId   String?
+  actor     User?    @relation("TimelineActor", fields: [actorId], references: [id])
+  type      String   // e.g. "CASE_CREATED", "STAGE_CHANGED", "DOCUMENT_UPLOADED"
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  userId         String?
+  user           User?    @relation("AuditActor", fields: [userId], references: [id])
+  action         String
+  affectedEntity String
+  affectedId     String
+  oldValue       Json?
+  newValue       Json?
+  createdAt      DateTime @default(now())
+
+  @@index([affectedEntity, affectedId])
+  @@index([userId])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  recipient   User             @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  title       String
+  body        String
+  relatedCaseId String?
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([recipientId, isRead])
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+model Payment {
+  id            String   @id @default(cuid())
+  caseId        String
+  case          Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  amount        Decimal  @db.Decimal(10, 3)
+  method        String   // cash | card | bank_transfer | benefitpay | other
+  invoiceNumber String?
+  receiptFileKey String?
+  paidAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  updatedAt DateTime @updatedAt
+}

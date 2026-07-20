@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: caseflow
+      POSTGRES_PASSWORD: caseflow
+      POSTGRES_DB: caseflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - caseflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caseflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://caseflow:caseflow@postgres:5432/caseflow?schema=public"
+      PORT: 4000
+      NODE_ENV: production
+      CLIENT_URL: "http://localhost:5173"
+      JWT_ACCESS_SECRET: "change-me-access-secret"
+      JWT_REFRESH_SECRET: "change-me-refresh-secret"
+      STORAGE_DRIVER: local
+      STORAGE_LOCAL_PATH: /app/uploads
+    volumes:
+      - caseflow_uploads:/app/uploads
+    ports:
+      - "4000:4000"
+
+  # Expects the frontend project checked out as a sibling folder named
+  # caseflow-frontend (see ../caseflow-frontend/README.md). Adjust the
+  # build context path if your layout differs.
+  web:
+    build: ../caseflow-frontend
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  caseflow_pgdata:
+  caseflow_uploads:
