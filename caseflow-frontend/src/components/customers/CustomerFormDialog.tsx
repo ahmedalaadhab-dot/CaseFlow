@@ -37,10 +37,13 @@ export function CustomerFormDialog({
   open,
   onOpenChange,
   customer,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer?: Customer;
+  /** Fires after a successful create (not edit) with the new customer — lets callers like CaseFormDialog auto-select it. */
+  onCreated?: (customer: Customer) => void;
 }) {
   const isEdit = !!customer;
   const { toast } = useToast();
@@ -78,8 +81,9 @@ export function CustomerFormDialog({
         await updateMutation.mutateAsync({ id: customer!.id, data: values });
         toast({ title: "Customer updated", variant: "success" });
       } else {
-        await createMutation.mutateAsync(values);
+        const created = await createMutation.mutateAsync(values);
         toast({ title: "Customer created", variant: "success" });
+        onCreated?.(created);
       }
       onOpenChange(false);
     } catch (err) {

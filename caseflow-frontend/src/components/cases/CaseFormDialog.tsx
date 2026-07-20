@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { UserPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,8 @@ import { useCustomers } from "@/hooks/useCustomers";
 import { useServiceTemplates } from "@/hooks/useDomain";
 import { useToast } from "@/components/ui/toast";
 import { getApiErrorMessage } from "@/lib/api-client";
+import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog";
+import type { Customer } from "@/lib/types";
 
 const schema = z.object({
   customerId: z.string().min(1, "Select a customer"),
@@ -45,6 +48,7 @@ export function CaseFormDialog({
   const { toast } = useToast();
   const createMutation = useCreateCase();
   const [customerSearch, setCustomerSearch] = React.useState("");
+  const [newCustomerOpen, setNewCustomerOpen] = React.useState(false);
   const { data: customersData } = useCustomers({ search: customerSearch || undefined, pageSize: 20 });
   const { data: templates } = useServiceTemplates();
 
@@ -53,6 +57,7 @@ export function CaseFormDialog({
     handleSubmit,
     control,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<Form>({
     resolver: zodResolver(schema),
@@ -62,6 +67,14 @@ export function CaseFormDialog({
   React.useEffect(() => {
     if (open) reset({ priority: "NORMAL", customerId: presetCustomerId ?? "" });
   }, [open, presetCustomerId, reset]);
+
+  const handleCustomerCreated = (customer: Customer) => {
+    // Make sure the new customer shows up as a selectable option (Select
+    // only knows about items currently rendered in its list) before
+    // pointing the form at them.
+    setCustomerSearch(customer.fullName);
+    setValue("customerId", customer.id, { shouldValidate: true });
+  };
 
   const onSubmit = async (values: Form) => {
     try {
@@ -83,120 +96,135 @@ export function CaseFormDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>New case</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New case</DialogTitle>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Customer</Label>
-            <Controller
-              control={control}
-              name="customerId"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="p-2">
-                      <Input
-                        placeholder="Search…"
-                        value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                    {customersData?.items.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.fullName} {c.cpr ? `· ${c.cpr}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Service</Label>
-            <Controller
-              control={control}
-              name="serviceTemplateId"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates?.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.serviceTemplateId && <p className="text-xs text-destructive">{errors.serviceTemplateId.message}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Priority</Label>
+              <div className="flex items-center justify-between">
+                <Label>Customer</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto py-0.5 text-xs text-accent"
+                  onClick={() => setNewCustomerOpen(true)}
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> New customer
+                </Button>
+              </div>
               <Controller
                 control={control}
-                name="priority"
+                name="customerId"
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="LOW">Low</SelectItem>
-                      <SelectItem value="NORMAL">Normal</SelectItem>
-                      <SelectItem value="HIGH">High</SelectItem>
-                      <SelectItem value="URGENT">Urgent</SelectItem>
+                      <div className="p-2">
+                        <Input
+                          placeholder="Search…"
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      {customersData?.items.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.fullName} {c.cpr ? `· ${c.cpr}` : ""}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
               />
+              {errors.customerId && <p className="text-xs text-destructive">{errors.customerId.message}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="dueDate">Due date</Label>
-              <Input id="dueDate" type="date" {...register("dueDate")} />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="caseCost">Case cost (BHD)</Label>
-              <Input id="caseCost" type="number" step="0.001" {...register("caseCost")} />
+              <Label>Service</Label>
+              <Controller
+                control={control}
+                name="serviceTemplateId"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates?.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.serviceTemplateId && <p className="text-xs text-destructive">{errors.serviceTemplateId.message}</p>}
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Priority</Label>
+                <Controller
+                  control={control}
+                  name="priority"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LOW">Low</SelectItem>
+                        <SelectItem value="NORMAL">Normal</SelectItem>
+                        <SelectItem value="HIGH">High</SelectItem>
+                        <SelectItem value="URGENT">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="dueDate">Due date</Label>
+                <Input id="dueDate" type="date" {...register("dueDate")} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="caseCost">Case cost (BHD)</Label>
+                <Input id="caseCost" type="number" step="0.001" {...register("caseCost")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="customerPrice">Customer price (BHD)</Label>
+                <Input id="customerPrice" type="number" step="0.001" {...register("customerPrice")} />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor="customerPrice">Customer price (BHD)</Label>
-              <Input id="customerPrice" type="number" step="0.001" {...register("customerPrice")} />
+              <Label htmlFor="description">Description</Label>
+              <Textarea id="description" {...register("description")} />
             </div>
-          </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" {...register("description")} />
-          </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" isLoading={isSubmitting}>
+                Create case
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={isSubmitting}>
-              Create case
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <CustomerFormDialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen} onCreated={handleCustomerCreated} />
+    </>
   );
 }
