@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,8 +21,10 @@ import { useCustomers } from "@/hooks/useCustomers";
 import { useServiceTemplates } from "@/hooks/useDomain";
 import { useToast } from "@/components/ui/toast";
 import { getApiErrorMessage } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog";
-import type { Customer } from "@/lib/types";
+import { ServiceTemplateFormDialog } from "@/components/settings/ServiceTemplateFormDialog";
+import type { Customer, ServiceTemplate } from "@/lib/types";
 
 const schema = z.object({
   customerId: z.string().min(1, "Select a customer"),
@@ -46,9 +48,11 @@ export function CaseFormDialog({
 }) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { hasRole } = useAuth();
   const createMutation = useCreateCase();
   const [customerSearch, setCustomerSearch] = React.useState("");
   const [newCustomerOpen, setNewCustomerOpen] = React.useState(false);
+  const [newServiceOpen, setNewServiceOpen] = React.useState(false);
   const { data: customersData } = useCustomers({ search: customerSearch || undefined, pageSize: 20 });
   const { data: templates } = useServiceTemplates();
 
@@ -74,6 +78,10 @@ export function CaseFormDialog({
     // pointing the form at them.
     setCustomerSearch(customer.fullName);
     setValue("customerId", customer.id, { shouldValidate: true });
+  };
+
+  const handleServiceCreated = (template: ServiceTemplate) => {
+    setValue("serviceTemplateId", template.id, { shouldValidate: true });
   };
 
   const onSubmit = async (values: Form) => {
@@ -147,7 +155,20 @@ export function CaseFormDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label>Service</Label>
+              <div className="flex items-center justify-between">
+                <Label>Service</Label>
+                {hasRole("MANAGER") && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto py-0.5 text-xs text-accent"
+                    onClick={() => setNewServiceOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> New service
+                  </Button>
+                )}
+              </div>
               <Controller
                 control={control}
                 name="serviceTemplateId"
@@ -225,6 +246,9 @@ export function CaseFormDialog({
       </Dialog>
 
       <CustomerFormDialog open={newCustomerOpen} onOpenChange={setNewCustomerOpen} onCreated={handleCustomerCreated} />
+      {hasRole("MANAGER") && (
+        <ServiceTemplateFormDialog open={newServiceOpen} onOpenChange={setNewServiceOpen} onCreated={handleServiceCreated} />
+      )}
     </>
   );
 }

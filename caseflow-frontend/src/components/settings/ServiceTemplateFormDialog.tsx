@@ -49,10 +49,13 @@ export function ServiceTemplateFormDialog({
   open,
   onOpenChange,
   template,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   template?: ServiceTemplate;
+  /** Fires after a successful create (not edit) with the new template — lets callers like CaseFormDialog auto-select it. */
+  onCreated?: (template: ServiceTemplate) => void;
 }) {
   const isEdit = !!template;
   const { toast } = useToast();
@@ -164,8 +167,9 @@ export function ServiceTemplateFormDialog({
         await updateMutation.mutateAsync({ id: template!.id, data: payload });
         toast({ title: "Service updated", variant: "success" });
       } else {
-        await createMutation.mutateAsync(payload);
+        const created = await createMutation.mutateAsync(payload);
         toast({ title: "Service created", variant: "success" });
+        onCreated?.(created);
       }
       onOpenChange(false);
     } catch (err) {
