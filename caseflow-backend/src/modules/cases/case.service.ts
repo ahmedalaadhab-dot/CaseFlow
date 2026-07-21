@@ -49,6 +49,16 @@ export const caseService = {
   async update(id: string, dto: UpdateCaseDto, actorId: string) {
     const existing = await this.getById(id);
 
+    // A PATCH can touch just one of these two fields, so the DTO-level
+    // check (case.dto.ts) can't see the whole picture — compare against
+    // whichever value isn't being changed too.
+    const effectiveCaseCost = dto.caseCost !== undefined ? dto.caseCost : Number(existing.caseCost ?? 0);
+    const effectiveCustomerPrice =
+      dto.customerPrice !== undefined ? dto.customerPrice : Number(existing.customerPrice ?? 0);
+    if (effectiveCustomerPrice < effectiveCaseCost) {
+      throw new ValidationError(undefined, "Customer price cannot be less than case cost");
+    }
+
     const wasReassigned = dto.assignedEmployeeId && dto.assignedEmployeeId !== existing.assignedEmployeeId;
 
     const updated = await caseRepository.update(id, dto);

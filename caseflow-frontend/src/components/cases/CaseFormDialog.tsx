@@ -26,15 +26,33 @@ import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog";
 import { ServiceTemplateFormDialog } from "@/components/settings/ServiceTemplateFormDialog";
 import type { Customer, ServiceTemplate } from "@/lib/types";
 
-const schema = z.object({
-  customerId: z.string().min(1, "Select a customer"),
-  serviceTemplateId: z.string().min(1, "Select a service"),
-  priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
-  dueDate: z.string().optional(),
-  description: z.string().optional(),
-  caseCost: z.string().optional(),
-  customerPrice: z.string().optional(),
-});
+// Plain string comparison on "YYYY-MM-DD" avoids new Date(dueDate) vs
+// new Date() timezone drift (the former parses as UTC midnight, the
+// latter is local time) — lexicographic order matches chronological
+// order for this format.
+function todayLocalISODate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const schema = z
+  .object({
+    customerId: z.string().min(1, "Select a customer"),
+    serviceTemplateId: z.string().min(1, "Select a service"),
+    priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
+    dueDate: z.string().optional(),
+    description: z.string().optional(),
+    caseCost: z.string().optional(),
+    customerPrice: z.string().optional(),
+  })
+  .refine((data) => !data.dueDate || data.dueDate >= todayLocalISODate(), {
+    message: "Due date cannot be in the past",
+    path: ["dueDate"],
+  })
+  .refine((data) => !data.caseCost || !data.customerPrice || Number(data.customerPrice) >= Number(data.caseCost), {
+    message: "Customer price cannot be less than case cost",
+    path: ["customerPrice"],
+  });
 type Form = z.infer<typeof schema>;
 
 export function CaseFormDialog({
@@ -213,18 +231,20 @@ export function CaseFormDialog({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="dueDate">Due date</Label>
-                <Input id="dueDate" type="date" {...register("dueDate")} />
+                <Input id="dueDate" type="date" min={todayLocalISODate()} {...register("dueDate")} />
+                {errors.dueDate && <p className="text-xs text-destructive">{errors.dueDate.message}</p>}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="caseCost">Case cost (BHD)</Label>
-                <Input id="caseCost" type="number" step="0.001" {...register("caseCost")} />
+                <Input id="caseCost" type="number" step="0.001" min="0" {...register("caseCost")} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="customerPrice">Customer price (BHD)</Label>
-                <Input id="customerPrice" type="number" step="0.001" {...register("customerPrice")} />
+                <Input id="customerPrice" type="number" step="0.001" min="0" {...register("customerPrice")} />
+                {errors.customerPrice && <p className="text-xs text-destructive">{errors.customerPrice.message}</p>}
               </div>
             </div>
 
