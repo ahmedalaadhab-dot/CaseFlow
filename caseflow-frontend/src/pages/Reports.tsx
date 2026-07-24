@@ -46,9 +46,9 @@ export default function ReportsPage() {
     queryKey: ["reports", "cases-by-employee"],
     queryFn: () => unwrap<{ employee: string; caseCount: number }[]>(api.get("/reports/cases-by-employee")),
   });
-  const { data: revenue } = useQuery({
-    queryKey: ["reports", "revenue"],
-    queryFn: () => unwrap<{ totalRevenue: number; byMethod: { method: string; total: number }[] }>(api.get("/reports/revenue")),
+  const { data: profit } = useQuery({
+    queryKey: ["reports", "profit"],
+    queryFn: () => unwrap<{ totalProfit: number }>(api.get("/reports/profit")),
   });
   const { data: popularity } = useQuery({
     queryKey: ["reports", "service-popularity"],
@@ -73,8 +73,8 @@ export default function ReportsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Total revenue</p>
-            <p className="mt-1 text-2xl font-semibold font-tag">{formatBHD(revenue?.totalRevenue ?? 0)}</p>
+            <p className="text-sm text-muted-foreground">Total profit</p>
+            <p className="mt-1 text-2xl font-semibold font-tag">{formatBHD(profit?.totalProfit ?? 0)}</p>
           </CardContent>
         </Card>
         <Card>

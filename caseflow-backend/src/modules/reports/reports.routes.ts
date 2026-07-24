@@ -18,13 +18,17 @@ const reportsService = {
     return rows.map((r) => ({ employee: nameById.get(r.assignedEmployeeId!) ?? "Unknown", caseCount: r._count }));
   },
 
-  async revenue() {
-    const { _sum } = await prisma.payment.aggregate({ where: { paidAt: { not: null } }, _sum: { amount: true } });
-    const byMethod = await prisma.payment.groupBy({ by: ["method"], where: { paidAt: { not: null } }, _sum: { amount: true } });
-    return {
-      totalRevenue: Number(_sum.amount ?? 0),
-      byMethod: byMethod.map((m) => ({ method: m.method, total: Number(m._sum.amount ?? 0) })),
-    };
+  // Profit per case (customerPrice - caseCost) isn't stored — same
+  // derivation the case detail "Financials" card uses — summed across all
+  // non-deleted cases. Prisma can't subtract two columns in an aggregate,
+  // so this reduces in JS rather than a groupBy/aggregate query.
+  async profit() {
+    const cases = await prisma.case.findMany({
+      where: { deletedAt: null },
+      select: { caseCost: true, customerPrice: true },
+    });
+    const totalProfit = cases.reduce((sum, c) => sum + (Number(c.customerPrice ?? 0) - Number(c.caseCost ?? 0)), 0);
+    return { totalProfit };
   },
 
   async servicePopularity() {
@@ -68,7 +72,7 @@ const reportsService = {
 
 const reportsController = {
   casesByEmployee: asyncHandler(async (_req: Request, res: Response) => ok(res, await reportsService.casesByEmployee())),
-  revenue: asyncHandler(async (_req: Request, res: Response) => ok(res, await reportsService.revenue())),
+  profit: asyncHandler(async (_req: Request, res: Response) => ok(res, await reportsService.profit())),
   servicePopularity: asyncHandler(async (_req: Request, res: Response) => ok(res, await reportsService.servicePopularity())),
   averageCompletionTime: asyncHandler(async (_req: Request, res: Response) => ok(res, await reportsService.averageCompletionTime())),
   overdueCases: asyncHandler(async (_req: Request, res: Response) => ok(res, await reportsService.overdueCases())),
@@ -79,7 +83,7 @@ const router = Router();
 router.use(requireAuth, requireRole("MANAGER", "EMPLOYEE"));
 
 router.get("/cases-by-employee", reportsController.casesByEmployee);
-router.get("/revenue", reportsController.revenue);
+router.get("/profit", reportsController.profit);
 router.get("/service-popularity", reportsController.servicePopularity);
 router.get("/average-completion-time", reportsController.averageCompletionTime);
 router.get("/overdue-cases", reportsController.overdueCases);
