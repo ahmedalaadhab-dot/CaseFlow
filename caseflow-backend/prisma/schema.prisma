@@ -69,6 +69,22 @@ enum NotificationType {
   CASE_OVERDUE
   DOCUMENT_MISSING
   PAYMENT_PENDING
+  RECURRING_CASE_CREATED
+}
+
+enum RecurrencePeriod {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  BIANNUALLY
+  ANNUALLY
+  CUSTOM
+}
+
+enum RecurrenceUnit {
+  DAYS
+  WEEKS
+  MONTHS
 }
 
 // ============================================================
@@ -149,6 +165,15 @@ model Customer {
   employer        String?
   notes           String?
   profilePicture  String?
+
+  ekeyUsername       String?
+  ekeyPassword       String?
+  molUsername        String?
+  molPassword        String?
+  tamkeenUsername    String?
+  tamkeenPassword    String?
+  sioUsername        String?
+  sioPassword        String?
 
   cases       Case[]
   favoritedBy FavoriteCustomer[]
@@ -271,8 +296,22 @@ model Case {
   isArchived                Boolean       @default(false)
   archivedAt                DateTime?
 
+  isRecurring            Boolean            @default(false)
+  recurrencePeriod       RecurrencePeriod?
+  recurrenceCustomValue  Int?               // only used when recurrencePeriod = CUSTOM
+  recurrenceCustomUnit   RecurrenceUnit?    // only used when recurrencePeriod = CUSTOM
+  // Set once this case has spawned its successor, so the recurrence job
+  // never generates a second case for the same due-date cycle even if the
+  // case is edited afterward. Reset to null when recurrence is
+  // (re-)enabled or the due date changes (see case.service.ts).
+  recurrenceGeneratedAt  DateTime?
+  recurrenceParentId     String?
+  recurrenceParent       Case?              @relation("CaseRecurrence", fields: [recurrenceParentId], references: [id], onDelete: SetNull)
+  recurrenceChildren     Case[]             @relation("CaseRecurrence")
+
   caseStages     CaseStage[]      @relation("CaseStagesOnCase")
   documents      Document[]
+  documentFolders DocumentFolder[]
   tasks          Task[]
   timelineEvents TimelineEvent[]
   payments       Payment[]
@@ -289,6 +328,7 @@ model Case {
   @@index([dueDate])
   @@index([isArchived])
   @@index([caseNumber])
+  @@index([isRecurring, recurrenceGeneratedAt, dueDate])
 }
 
 // A per-case copy of the template's stages, so editing a template later
@@ -343,6 +383,8 @@ model Document {
   caseId      String
   case        Case             @relation(fields: [caseId], references: [id], onDelete: Cascade)
   category    DocumentCategory
+  folderId    String?
+  folder      DocumentFolder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
   fileName    String
   storageKey  String           // abstracted storage path/key (local path or future S3 key)
   mimeType    String
@@ -357,6 +399,23 @@ model Document {
 
   @@index([caseId])
   @@index([category])
+  @@index([folderId])
+}
+
+// User-defined, per-case grouping for documents (e.g. "2026 renewal",
+// "employer paperwork") — independent of the fixed DocumentCategory enum,
+// which classifies file type rather than the customer's own organization.
+model DocumentFolder {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  name      String
+  documents Document[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([caseId, name])
+  @@index([caseId])
 }
 
 // ============================================================
