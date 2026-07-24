@@ -104,6 +104,14 @@ export function useRestoreCase() {
   });
 }
 
+export function useHardDeleteCase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/cases/${id}/permanent`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cases"] }),
+  });
+}
+
 export function useRunRecurrenceCheck() {
   const qc = useQueryClient();
   return useMutation({

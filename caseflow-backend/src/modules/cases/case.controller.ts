@@ -73,6 +73,12 @@ export const caseController = {
     return ok(res, { message: "Case deleted" });
   }),
 
+  hardDelete: asyncHandler(async (req: Request, res: Response) => {
+    const user = requireUser(req);
+    await caseService.hardDelete(req.params.id, user.id);
+    return ok(res, { message: "Case permanently deleted" });
+  }),
+
   runRecurrence: asyncHandler(async (_req: Request, res: Response) => {
     const result = await recurrenceService.processDueRecurrences();
     return ok(res, result);

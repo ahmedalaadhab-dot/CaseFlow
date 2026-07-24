@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { caseRepository } from "./case.repository";
 import { CreateCaseDto, UpdateCaseDto, CaseQueryDto } from "./case.dto";
@@ -5,6 +6,7 @@ import { generateCaseNumber } from "../../common/utils/caseNumber";
 import { NotFoundError, ValidationError, ForbiddenError } from "../../common/errors/AppError";
 import { buildMeta } from "../../common/utils/pagination";
 import { notificationService } from "../notifications/notification.service";
+import { storage } from "../../common/storage";
 
 export const caseService = {
   async list(query: CaseQueryDto) {
@@ -213,5 +215,32 @@ export const caseService = {
   async remove(id: string) {
     await this.getById(id);
     return caseRepository.softDelete(id);
+  },
+
+  // Irreversible: wipes the case and every related row (documents, folders,
+  // tasks, timeline, payments, stages/checklist) from the DB, plus the
+  // underlying document/receipt files from storage. Deliberately looks the
+  // case up directly rather than via getById(), which filters out
+  // already-soft-deleted/archived cases — this should work regardless of
+  // status since "permanently delete" is a stronger, independent action.
+  async hardDelete(id: string, actorId: string) {
+    const existing = await prisma.case.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundError("Case");
+
+    const { documentKeys, receiptKeys } = await caseRepository.getStorageKeys(id);
+
+    const snapshot = {
+      caseNumber: existing.caseNumber,
+      customerId: existing.customerId,
+      serviceTemplateId: existing.serviceTemplateId,
+      status: existing.status,
+      createdAt: existing.createdAt.toISOString(),
+    } satisfies Prisma.InputJsonValue;
+
+    await caseRepository.hardDelete(id, actorId, snapshot);
+
+    // DB rows are already gone at this point — a file that's missing or
+    // fails to delete shouldn't undo (or fail to report) the DB deletion.
+    await Promise.allSettled([...documentKeys, ...receiptKeys].map((key) => storage.delete(key)));
   },
 };

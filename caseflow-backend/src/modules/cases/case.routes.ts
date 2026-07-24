@@ -12,6 +12,9 @@ router.get("/:id", caseController.getById);
 router.post("/", requireRole("MANAGER", "EMPLOYEE", "RECEPTION"), caseController.create);
 router.patch("/:id", requireRole("MANAGER", "EMPLOYEE"), caseController.update);
 router.delete("/:id", requireRole("MANAGER"), caseController.remove);
+// Irreversible: wipes the case and everything tied to it (documents, payments,
+// tasks, timeline) from the DB, not just the deletedAt soft-delete above.
+router.delete("/:id/permanent", requireRole("MANAGER"), caseController.hardDelete);
 
 router.post("/:id/advance-stage", requireRole("MANAGER", "EMPLOYEE"), caseController.advanceStage);
 router.patch("/:id/checklist/:itemId", requireRole("MANAGER", "EMPLOYEE", "RECEPTION"), caseController.toggleChecklistItem);

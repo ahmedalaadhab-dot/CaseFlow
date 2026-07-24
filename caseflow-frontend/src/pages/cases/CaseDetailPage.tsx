@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Archive as ArchiveIcon, Pencil } from "lucide-react";
+import { ArrowLeft, Archive as ArchiveIcon, Pencil, Trash2, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Repeat } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { StatusBadge, PriorityBadge } from "@/components/status-badges";
-import { useCase, useUpdateCase, useArchiveCase } from "@/hooks/useCases";
+import { useCase, useUpdateCase, useArchiveCase, useHardDeleteCase } from "@/hooks/useCases";
 import { StagePanel } from "@/components/cases/StagePanel";
 import { DocumentsPanel } from "@/components/cases/DocumentsPanel";
 import { TasksPanel } from "@/components/cases/TasksPanel";
@@ -35,11 +35,15 @@ export default function CaseDetailPage() {
   const { data: caseData, isLoading } = useCase(id);
   const updateCase = useUpdateCase();
   const archiveCase = useArchiveCase();
+  const hardDeleteCase = useHardDeleteCase();
   const { toast } = useToast();
   const { hasRole } = useAuth();
 
   const [notes, setNotes] = React.useState("");
   React.useEffect(() => setNotes(caseData?.internalNotes ?? ""), [caseData?.internalNotes]);
+
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = React.useState("");
 
   const [customValue, setCustomValue] = React.useState("");
   React.useEffect(() => setCustomValue(caseData?.recurrenceCustomValue ? String(caseData.recurrenceCustomValue) : ""), [caseData?.recurrenceCustomValue]);
@@ -67,18 +71,33 @@ export default function CaseDetailPage() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/cases")}>
           <ArrowLeft className="h-4 w-4" /> Back to cases
         </Button>
-        {caseData.status === "COMPLETED" && !caseData.isArchived && canEdit && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={async () => {
-              await archiveCase.mutateAsync(caseData.id);
-              toast({ title: "Case archived", variant: "success" });
-            }}
-          >
-            <ArchiveIcon className="h-4 w-4" /> Archive case
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {caseData.status === "COMPLETED" && !caseData.isArchived && canEdit && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await archiveCase.mutateAsync(caseData.id);
+                toast({ title: "Case archived", variant: "success" });
+              }}
+            >
+              <ArchiveIcon className="h-4 w-4" /> Archive case
+            </Button>
+          )}
+          {hasRole("MANAGER") && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => {
+                setDeleteConfirmText("");
+                setDeleteOpen(true);
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete permanently
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -337,6 +356,50 @@ export default function CaseDetailPage() {
           <TimelinePanel events={caseData.timelineEvents ?? []} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {caseData.caseNumber} permanently?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This permanently removes the case and everything tied to it — documents, payments, tasks, checklist
+            progress, and timeline history — from the database. This cannot be undone.
+          </p>
+          <div className="space-y-1.5">
+            <label htmlFor="deleteConfirm" className="text-xs text-muted-foreground">
+              Type <span className="font-tag font-medium text-foreground">{caseData.caseNumber}</span> to confirm
+            </label>
+            <Input
+              id="deleteConfirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmText !== caseData.caseNumber}
+              isLoading={hardDeleteCase.isPending}
+              onClick={async () => {
+                try {
+                  await hardDeleteCase.mutateAsync(caseData.id);
+                  toast({ title: "Case permanently deleted", variant: "success" });
+                  navigate("/cases");
+                } catch (err) {
+                  toast({ title: "Couldn't delete case", description: getApiErrorMessage(err), variant: "destructive" });
+                }
+              }}
+            >
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

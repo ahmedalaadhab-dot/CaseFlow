@@ -166,6 +166,36 @@ export const caseRepository = {
     return prisma.case.update({ where: { id }, data: { deletedAt: new Date() } });
   },
 
+  // Storage files (document scans, payment receipts) live outside the DB
+  // and aren't touched by the cascade below — the caller deletes them from
+  // `storage` separately using the keys returned here.
+  async getStorageKeys(caseId: string) {
+    const [documents, payments] = await Promise.all([
+      prisma.document.findMany({ where: { caseId }, select: { storageKey: true } }),
+      prisma.payment.findMany({ where: { caseId }, select: { receiptFileKey: true } }),
+    ]);
+    return {
+      documentKeys: documents.map((d) => d.storageKey),
+      receiptKeys: payments.map((p) => p.receiptFileKey).filter((k): k is string => !!k),
+    };
+  },
+
+  // Every child row (documents, folders, tasks, timeline events, payments,
+  // stages/checklist items, pins) cascades at the DB level per the schema.
+  // Notification.relatedCaseId has no FK (plain string), so it's cleaned up
+  // explicitly here to avoid leaving dangling references. The audit log
+  // entry is written in the same transaction so there's no window where
+  // the case is gone but undocumented.
+  hardDelete(id: string, actorId: string, snapshot: Prisma.InputJsonValue) {
+    return prisma.$transaction([
+      prisma.auditLog.create({
+        data: { userId: actorId, action: "CASE_HARD_DELETE", affectedEntity: "Case", affectedId: id, oldValue: snapshot },
+      }),
+      prisma.notification.deleteMany({ where: { relatedCaseId: id } }),
+      prisma.case.delete({ where: { id } }),
+    ]);
+  },
+
   addTimelineEvent(params: { caseId: string; actorId?: string; type: string; message: string; metadata?: Prisma.InputJsonValue }) {
     return prisma.timelineEvent.create({ data: params });
   },
