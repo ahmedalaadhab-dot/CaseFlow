@@ -526,3 +526,12 @@ model Setting {
 
   updatedAt DateTime @updatedAt
 }
+
+// Backs generateCaseNumber() (common/utils/caseNumber.ts). A dedicated,
+// monotonically-increasing counter per year — not derived from counting
+// live Case rows, which breaks the moment any case is deleted (the count
+// drops, so the next "generated" number collides with one still in use).
+model CaseNumberCounter {
+  year  Int @id
+  value Int @default(0)
+}
