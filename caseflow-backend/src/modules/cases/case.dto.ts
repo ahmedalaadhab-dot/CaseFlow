@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CaseStatus, Priority } from "@prisma/client";
+import { CaseStatus, Priority, RecurrencePeriod, RecurrenceUnit } from "@prisma/client";
 
 function isPastDate(date: Date): boolean {
   const startOfToday = new Date();
@@ -27,6 +27,37 @@ function validateCostAndDueDate(
   }
 }
 
+const recurrenceFields = {
+  isRecurring: z.boolean().optional(),
+  recurrencePeriod: z.nativeEnum(RecurrencePeriod).optional(),
+  recurrenceCustomValue: z.number().int().positive().optional(),
+  recurrenceCustomUnit: z.nativeEnum(RecurrenceUnit).optional(),
+};
+
+// Create always sees the whole picture in one request, so recurrence
+// requirements (a due date + period, and a custom interval when the period
+// is CUSTOM) can be fully validated here. Update can't — a PATCH may only
+// touch one field of an already-recurring case — so that cross-field check
+// is done in case.service.ts's update() against the merged effective state.
+function validateRecurrence(
+  data: { isRecurring?: boolean; dueDate?: Date | null; recurrencePeriod?: RecurrencePeriod; recurrenceCustomValue?: number; recurrenceCustomUnit?: RecurrenceUnit },
+  ctx: z.RefinementCtx
+) {
+  if (!data.isRecurring) return;
+  if (!data.dueDate) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dueDate"], message: "Recurring cases require a due date" });
+  }
+  if (!data.recurrencePeriod) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["recurrencePeriod"], message: "Select a recurrence period" });
+  } else if (data.recurrencePeriod === "CUSTOM" && (!data.recurrenceCustomValue || !data.recurrenceCustomUnit)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["recurrenceCustomValue"],
+      message: "Custom recurrence needs an interval and unit",
+    });
+  }
+}
+
 export const createCaseSchema = z
   .object({
     customerId: z.string().min(1),
@@ -37,8 +68,10 @@ export const createCaseSchema = z
     description: z.string().optional(),
     caseCost: z.number().nonnegative().optional(),
     customerPrice: z.number().nonnegative().optional(),
+    ...recurrenceFields,
   })
-  .superRefine(validateCostAndDueDate);
+  .superRefine(validateCostAndDueDate)
+  .superRefine(validateRecurrence);
 export type CreateCaseDto = z.infer<typeof createCaseSchema>;
 
 export const updateCaseSchema = z
@@ -53,6 +86,7 @@ export const updateCaseSchema = z
     governmentTrackingNumber: z.string().optional(),
     caseCost: z.number().nonnegative().optional(),
     customerPrice: z.number().nonnegative().optional(),
+    ...recurrenceFields,
   })
   .superRefine(validateCostAndDueDate);
 export type UpdateCaseDto = z.infer<typeof updateCaseSchema>;

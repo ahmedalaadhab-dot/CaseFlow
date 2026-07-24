@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Repeat } from "lucide-react";
 import { StatusBadge, PriorityBadge } from "@/components/status-badges";
 import { useCase, useUpdateCase, useArchiveCase } from "@/hooks/useCases";
 import { StagePanel } from "@/components/cases/StagePanel";
@@ -14,9 +18,11 @@ import { TasksPanel } from "@/components/cases/TasksPanel";
 import { PaymentsPanel } from "@/components/cases/PaymentsPanel";
 import { TimelinePanel } from "@/components/cases/TimelinePanel";
 import { useToast } from "@/components/ui/toast";
+import { getApiErrorMessage } from "@/lib/api-client";
 import { formatDate, formatBHD } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import type { CaseStatus, Priority } from "@/lib/types";
+import { RECURRENCE_PERIODS, RECURRENCE_PERIOD_LABELS, RECURRENCE_UNITS, RECURRENCE_UNIT_LABELS } from "@/lib/recurrence";
+import type { CaseStatus, Priority, RecurrencePeriod, RecurrenceUnit } from "@/lib/types";
 
 const STATUS_OPTIONS: CaseStatus[] = [
   "NEW", "IN_PROGRESS", "WAITING_FOR_CLIENT", "WAITING_FOR_GOVERNMENT", "WAITING_FOR_PAYMENT", "COMPLETED", "CANCELLED",
@@ -35,9 +41,25 @@ export default function CaseDetailPage() {
   const [notes, setNotes] = React.useState("");
   React.useEffect(() => setNotes(caseData?.internalNotes ?? ""), [caseData?.internalNotes]);
 
+  const [customValue, setCustomValue] = React.useState("");
+  React.useEffect(() => setCustomValue(caseData?.recurrenceCustomValue ? String(caseData.recurrenceCustomValue) : ""), [caseData?.recurrenceCustomValue]);
+
   if (isLoading || !caseData) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   const canEdit = hasRole("MANAGER", "EMPLOYEE");
+
+  async function saveRecurrence(data: {
+    isRecurring?: boolean;
+    recurrencePeriod?: RecurrencePeriod;
+    recurrenceCustomValue?: number;
+    recurrenceCustomUnit?: RecurrenceUnit;
+  }) {
+    try {
+      await updateCase.mutateAsync({ id: caseData!.id, data });
+    } catch (err) {
+      toast({ title: "Couldn't update recurrence", description: getApiErrorMessage(err), variant: "destructive" });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -68,6 +90,11 @@ export default function CaseDetailPage() {
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={caseData.status} />
           <PriorityBadge priority={caseData.priority} />
+          {caseData.isRecurring && (
+            <Badge variant="outline" className="gap-1">
+              <Repeat className="h-3 w-3" /> Recurring
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -147,6 +174,99 @@ export default function CaseDetailPage() {
                     <p className="text-xs text-muted-foreground">Government tracking #</p>
                     <p className="mt-2 font-tag text-sm">{caseData.governmentTrackingNumber ?? "—"}</p>
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="isRecurring"
+                      checked={caseData.isRecurring}
+                      disabled={!canEdit}
+                      onCheckedChange={(checked) => {
+                        const isRecurring = !!checked;
+                        if (isRecurring && !caseData.dueDate) {
+                          toast({
+                            title: "Set a due date first",
+                            description: "Recurring cases need a due date to know when to generate the next one.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        saveRecurrence({ isRecurring, recurrencePeriod: isRecurring ? (caseData.recurrencePeriod ?? "MONTHLY") : undefined });
+                      }}
+                    />
+                    <label htmlFor="isRecurring" className="cursor-pointer text-xs text-muted-foreground">
+                      Recurring case
+                    </label>
+                  </div>
+
+                  {caseData.isRecurring && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Select
+                        value={caseData.recurrencePeriod ?? undefined}
+                        onValueChange={(v) => saveRecurrence({ recurrencePeriod: v as RecurrencePeriod })}
+                        disabled={!canEdit}
+                      >
+                        <SelectTrigger className="h-8 w-36 text-xs">
+                          <SelectValue placeholder="Select period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {RECURRENCE_PERIODS.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {RECURRENCE_PERIOD_LABELS[p]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {caseData.recurrencePeriod === "CUSTOM" && (
+                        <>
+                          <Input
+                            type="number"
+                            min="1"
+                            className="h-8 w-16 text-xs"
+                            value={customValue}
+                            disabled={!canEdit}
+                            onChange={(e) => setCustomValue(e.target.value)}
+                            onBlur={() => {
+                              const n = Number(customValue);
+                              if (n > 0 && n !== caseData.recurrenceCustomValue) {
+                                saveRecurrence({
+                                  recurrenceCustomValue: n,
+                                  recurrenceCustomUnit: caseData.recurrenceCustomUnit ?? "DAYS",
+                                });
+                              }
+                            }}
+                          />
+                          <Select
+                            value={caseData.recurrenceCustomUnit ?? undefined}
+                            onValueChange={(v) =>
+                              saveRecurrence({
+                                recurrenceCustomUnit: v as RecurrenceUnit,
+                                recurrenceCustomValue: caseData.recurrenceCustomValue ?? (Number(customValue) || 1),
+                              })
+                            }
+                            disabled={!canEdit}
+                          >
+                            <SelectTrigger className="h-8 w-28 text-xs">
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {RECURRENCE_UNITS.map((u) => (
+                                <SelectItem key={u} value={u}>
+                                  {RECURRENCE_UNIT_LABELS[u]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {caseData.recurrenceParentId && (
+                    <p className="mt-2 text-xs text-muted-foreground">Auto-generated from a previous recurring case.</p>
+                  )}
                 </div>
 
                 {caseData.description && (

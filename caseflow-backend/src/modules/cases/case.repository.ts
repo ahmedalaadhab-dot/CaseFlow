@@ -82,6 +82,11 @@ export const caseRepository = {
     description?: string;
     caseCost?: number;
     customerPrice?: number;
+    isRecurring?: boolean;
+    recurrencePeriod?: Prisma.CaseCreateInput["recurrencePeriod"];
+    recurrenceCustomValue?: number;
+    recurrenceCustomUnit?: Prisma.CaseCreateInput["recurrenceCustomUnit"];
+    recurrenceParentId?: string;
   }) {
     // Snapshot the template's stages/checklist onto the case at creation
     // time, so later edits to the template don't rewrite case history.
@@ -103,6 +108,11 @@ export const caseRepository = {
           description: params.description,
           caseCost: params.caseCost,
           customerPrice: params.customerPrice,
+          isRecurring: params.isRecurring ?? false,
+          recurrencePeriod: params.recurrencePeriod,
+          recurrenceCustomValue: params.recurrenceCustomValue,
+          recurrenceCustomUnit: params.recurrenceCustomUnit,
+          recurrenceParentId: params.recurrenceParentId,
         },
       });
 
@@ -148,7 +158,7 @@ export const caseRepository = {
     });
   },
 
-  update(id: string, data: UpdateCaseDto) {
+  update(id: string, data: UpdateCaseDto & { recurrenceGeneratedAt?: Date | null }) {
     return prisma.case.update({ where: { id }, data, include: caseDetailInclude });
   },
 

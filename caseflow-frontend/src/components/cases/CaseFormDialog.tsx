@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useCreateCase } from "@/hooks/useCases";
 import { useCustomers } from "@/hooks/useCustomers";
@@ -24,6 +25,7 @@ import { getApiErrorMessage } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { CustomerFormDialog } from "@/components/customers/CustomerFormDialog";
 import { ServiceTemplateFormDialog } from "@/components/settings/ServiceTemplateFormDialog";
+import { RECURRENCE_PERIODS, RECURRENCE_PERIOD_LABELS, RECURRENCE_UNITS, RECURRENCE_UNIT_LABELS } from "@/lib/recurrence";
 import type { Customer, ServiceTemplate } from "@/lib/types";
 
 // Plain string comparison on "YYYY-MM-DD" avoids new Date(dueDate) vs
@@ -44,6 +46,10 @@ const schema = z
     description: z.string().optional(),
     caseCost: z.string().optional(),
     customerPrice: z.string().optional(),
+    isRecurring: z.boolean().default(false),
+    recurrencePeriod: z.enum(["WEEKLY", "MONTHLY", "QUARTERLY", "BIANNUALLY", "ANNUALLY", "CUSTOM"]).optional(),
+    recurrenceCustomValue: z.string().optional(),
+    recurrenceCustomUnit: z.enum(["DAYS", "WEEKS", "MONTHS"]).optional(),
   })
   .refine((data) => !data.dueDate || data.dueDate >= todayLocalISODate(), {
     message: "Due date cannot be in the past",
@@ -52,7 +58,19 @@ const schema = z
   .refine((data) => !data.caseCost || !data.customerPrice || Number(data.customerPrice) >= Number(data.caseCost), {
     message: "Customer price cannot be less than case cost",
     path: ["customerPrice"],
-  });
+  })
+  .refine((data) => !data.isRecurring || !!data.dueDate, {
+    message: "Recurring cases need a due date",
+    path: ["dueDate"],
+  })
+  .refine((data) => !data.isRecurring || !!data.recurrencePeriod, {
+    message: "Select a recurrence period",
+    path: ["recurrencePeriod"],
+  })
+  .refine(
+    (data) => !data.isRecurring || data.recurrencePeriod !== "CUSTOM" || (!!data.recurrenceCustomValue && !!data.recurrenceCustomUnit),
+    { message: "Enter an interval and unit", path: ["recurrenceCustomValue"] }
+  );
 type Form = z.infer<typeof schema>;
 
 export function CaseFormDialog({
@@ -80,15 +98,19 @@ export function CaseFormDialog({
     control,
     reset,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<Form>({
     resolver: zodResolver(schema),
-    defaultValues: { priority: "NORMAL", customerId: presetCustomerId ?? "" },
+    defaultValues: { priority: "NORMAL", customerId: presetCustomerId ?? "", isRecurring: false },
   });
 
   React.useEffect(() => {
-    if (open) reset({ priority: "NORMAL", customerId: presetCustomerId ?? "" });
+    if (open) reset({ priority: "NORMAL", customerId: presetCustomerId ?? "", isRecurring: false });
   }, [open, presetCustomerId, reset]);
+
+  const isRecurring = watch("isRecurring");
+  const recurrencePeriod = watch("recurrencePeriod");
 
   const handleCustomerCreated = (customer: Customer) => {
     // Make sure the new customer shows up as a selectable option (Select
@@ -112,6 +134,11 @@ export function CaseFormDialog({
         description: values.description || undefined,
         caseCost: values.caseCost ? Number(values.caseCost) : undefined,
         customerPrice: values.customerPrice ? Number(values.customerPrice) : undefined,
+        isRecurring: values.isRecurring,
+        recurrencePeriod: values.isRecurring ? values.recurrencePeriod : undefined,
+        recurrenceCustomValue:
+          values.isRecurring && values.recurrencePeriod === "CUSTOM" ? Number(values.recurrenceCustomValue) : undefined,
+        recurrenceCustomUnit: values.isRecurring && values.recurrencePeriod === "CUSTOM" ? values.recurrenceCustomUnit : undefined,
       });
       toast({ title: "Case created", description: created.caseNumber, variant: "success" });
       onOpenChange(false);
@@ -246,6 +273,90 @@ export function CaseFormDialog({
                 <Input id="customerPrice" type="number" step="0.001" min="0" {...register("customerPrice")} />
                 {errors.customerPrice && <p className="text-xs text-destructive">{errors.customerPrice.message}</p>}
               </div>
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border p-3">
+              <div className="flex items-center gap-2">
+                <Controller
+                  control={control}
+                  name="isRecurring"
+                  render={({ field }) => (
+                    <Checkbox id="isRecurring" checked={field.value} onCheckedChange={(v) => field.onChange(!!v)} />
+                  )}
+                />
+                <Label htmlFor="isRecurring" className="cursor-pointer font-normal">
+                  Recurring case
+                </Label>
+              </div>
+
+              {isRecurring && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Recurrence period</Label>
+                    <Controller
+                      control={control}
+                      name="recurrencePeriod"
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select period" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RECURRENCE_PERIODS.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {RECURRENCE_PERIOD_LABELS[p]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    {errors.recurrencePeriod && <p className="text-xs text-destructive">{errors.recurrencePeriod.message}</p>}
+                  </div>
+
+                  {recurrencePeriod === "CUSTOM" && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="recurrenceCustomValue">Repeat every</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="recurrenceCustomValue"
+                          type="number"
+                          min="1"
+                          className="w-20"
+                          {...register("recurrenceCustomValue")}
+                        />
+                        <Controller
+                          control={control}
+                          name="recurrenceCustomUnit"
+                          render={({ field }) => (
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Unit" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {RECURRENCE_UNITS.map((u) => (
+                                  <SelectItem key={u} value={u}>
+                                    {RECURRENCE_UNIT_LABELS[u]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </div>
+                      {errors.recurrenceCustomValue && (
+                        <p className="text-xs text-destructive">{errors.recurrenceCustomValue.message}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {isRecurring && !watch("dueDate") && (
+                <p className="text-xs text-muted-foreground">
+                  Set a due date above — recurring cases use it to know when to generate the next one.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

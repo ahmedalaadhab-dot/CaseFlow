@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler, ok } from "../../common/middleware/errorHandler";
 import { caseService } from "./case.service";
+import { recurrenceService } from "./recurrence.service";
 import {
   createCaseSchema,
   updateCaseSchema,
@@ -70,5 +71,10 @@ export const caseController = {
   remove: asyncHandler(async (req: Request, res: Response) => {
     await caseService.remove(req.params.id);
     return ok(res, { message: "Case deleted" });
+  }),
+
+  runRecurrence: asyncHandler(async (_req: Request, res: Response) => {
+    const result = await recurrenceService.processDueRecurrences();
+    return ok(res, result);
   }),
 };

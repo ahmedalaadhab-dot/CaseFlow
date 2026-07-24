@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/lib/api-client";
-import type { Case, CaseStatus, Priority, PaginatedMeta } from "@/lib/types";
+import type { Case, CaseStatus, Priority, PaginatedMeta, RecurrencePeriod, RecurrenceUnit } from "@/lib/types";
 
 export interface CaseQuery {
   search?: string;
@@ -47,6 +47,10 @@ export function useCreateCase() {
       description?: string;
       caseCost?: number;
       customerPrice?: number;
+      isRecurring?: boolean;
+      recurrencePeriod?: RecurrencePeriod;
+      recurrenceCustomValue?: number;
+      recurrenceCustomUnit?: RecurrenceUnit;
     }) => unwrap<Case>(api.post("/cases", data)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cases"] }),
   });
@@ -96,6 +100,14 @@ export function useRestoreCase() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => unwrap<Case>(api.post(`/cases/${id}/restore`)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cases"] }),
+  });
+}
+
+export function useRunRecurrenceCheck() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap<{ processed: number; created: string[] }>(api.post("/cases/recurrence/run")),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cases"] }),
   });
 }

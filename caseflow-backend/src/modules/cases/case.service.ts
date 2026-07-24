@@ -31,6 +31,10 @@ export const caseService = {
       description: dto.description,
       caseCost: dto.caseCost,
       customerPrice: dto.customerPrice,
+      isRecurring: dto.isRecurring ?? false,
+      recurrencePeriod: dto.isRecurring ? dto.recurrencePeriod : undefined,
+      recurrenceCustomValue: dto.isRecurring && dto.recurrencePeriod === "CUSTOM" ? dto.recurrenceCustomValue : undefined,
+      recurrenceCustomUnit: dto.isRecurring && dto.recurrencePeriod === "CUSTOM" ? dto.recurrenceCustomUnit : undefined,
     });
 
     if (dto.assignedEmployeeId) {
@@ -61,7 +65,35 @@ export const caseService = {
 
     const wasReassigned = dto.assignedEmployeeId && dto.assignedEmployeeId !== existing.assignedEmployeeId;
 
-    const updated = await caseRepository.update(id, dto);
+    // A PATCH can touch just one recurrence field, so validate against the
+    // merged effective state (mirrors the cost/price check above).
+    const effectiveIsRecurring = dto.isRecurring ?? existing.isRecurring;
+    let recurrenceGeneratedAt: Date | null | undefined;
+    if (effectiveIsRecurring) {
+      const effectiveDueDate = dto.dueDate !== undefined ? dto.dueDate : existing.dueDate;
+      const effectivePeriod = dto.recurrencePeriod ?? existing.recurrencePeriod ?? undefined;
+      if (!effectiveDueDate) throw new ValidationError(undefined, "Recurring cases require a due date");
+      if (!effectivePeriod) throw new ValidationError(undefined, "Select a recurrence period");
+      if (effectivePeriod === "CUSTOM") {
+        const effectiveCustomValue = dto.recurrenceCustomValue ?? existing.recurrenceCustomValue ?? undefined;
+        const effectiveCustomUnit = dto.recurrenceCustomUnit ?? existing.recurrenceCustomUnit ?? undefined;
+        if (!effectiveCustomValue || !effectiveCustomUnit) {
+          throw new ValidationError(undefined, "Custom recurrence needs an interval and unit");
+        }
+      }
+
+      // Recurrence was just turned on, or the due date moved — either way
+      // this case hasn't generated a successor for its (new) due date yet,
+      // so clear any stale "already generated" marker.
+      const recurringJustEnabled = dto.isRecurring === true && !existing.isRecurring;
+      const dueDateChanged =
+        dto.dueDate !== undefined && (dto.dueDate?.getTime() ?? null) !== (existing.dueDate?.getTime() ?? null);
+      if (existing.recurrenceGeneratedAt && (recurringJustEnabled || dueDateChanged)) {
+        recurrenceGeneratedAt = null;
+      }
+    }
+
+    const updated = await caseRepository.update(id, { ...dto, ...(recurrenceGeneratedAt !== undefined ? { recurrenceGeneratedAt } : {}) });
 
     if (dto.status && dto.status !== existing.status) {
       await caseRepository.addTimelineEvent({

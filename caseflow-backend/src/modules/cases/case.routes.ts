@@ -19,4 +19,8 @@ router.patch("/:id/checklist/:itemId", requireRole("MANAGER", "EMPLOYEE", "RECEP
 router.post("/:id/archive", requireRole("MANAGER", "EMPLOYEE"), caseController.archive);
 router.post("/:id/restore", requireRole("MANAGER"), caseController.restore);
 
+// Manual trigger for the recurring-case scheduler (also runs automatically —
+// see server.ts). Useful for admins who don't want to wait for the next tick.
+router.post("/recurrence/run", requireRole("MANAGER"), caseController.runRecurrence);
+
 export default router;

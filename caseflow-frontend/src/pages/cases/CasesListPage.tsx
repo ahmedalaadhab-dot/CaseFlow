@@ -1,11 +1,14 @@
 import * as React from "react";
-import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { useCases } from "@/hooks/useCases";
+import { useCases, useRunRecurrenceCheck } from "@/hooks/useCases";
 import { CaseCard } from "@/components/cases/CaseCard";
 import { CaseFormDialog } from "@/components/cases/CaseFormDialog";
+import { useToast } from "@/components/ui/toast";
+import { getApiErrorMessage } from "@/lib/api-client";
+import { RoleGate } from "@/routes/RoleGate";
 import type { CaseStatus, Priority } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: CaseStatus; label: string }[] = [
@@ -31,6 +34,8 @@ export default function CasesListPage() {
   const [priority, setPriority] = React.useState<Priority | "ALL">("ALL");
   const [page, setPage] = React.useState(1);
   const [createOpen, setCreateOpen] = React.useState(false);
+  const { toast } = useToast();
+  const runRecurrenceCheck = useRunRecurrenceCheck();
 
   const { data, isLoading } = useCases({
     search: search || undefined,
@@ -47,9 +52,31 @@ export default function CasesListPage() {
           <h1 className="text-xl font-semibold">Cases</h1>
           <p className="text-sm text-muted-foreground">{data?.meta.totalCount ?? 0} total</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" /> New case
-        </Button>
+        <div className="flex gap-2">
+          <RoleGate roles={["MANAGER"]}>
+            <Button
+              variant="outline"
+              isLoading={runRecurrenceCheck.isPending}
+              onClick={async () => {
+                try {
+                  const result = await runRecurrenceCheck.mutateAsync();
+                  toast({
+                    title: result.processed > 0 ? `Generated ${result.processed} recurring case(s)` : "No recurring cases due",
+                    description: result.created.join(", ") || undefined,
+                    variant: "success",
+                  });
+                } catch (err) {
+                  toast({ title: "Couldn't run recurrence check", description: getApiErrorMessage(err), variant: "destructive" });
+                }
+              }}
+            >
+              <RefreshCw className="h-4 w-4" /> Check recurring
+            </Button>
+          </RoleGate>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" /> New case
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
