@@ -19,6 +19,7 @@ export const documentRepository = {
   create(data: {
     caseId: string;
     category: string;
+    folderId?: string;
     fileName: string;
     storageKey: string;
     mimeType: string;
@@ -30,8 +31,8 @@ export const documentRepository = {
     return prisma.document.create({ data: data as any });
   },
 
-  rename(id: string, fileName: string) {
-    return prisma.document.update({ where: { id }, data: { fileName } });
+  update(id: string, data: { fileName?: string; folderId?: string | null }) {
+    return prisma.document.update({ where: { id }, data });
   },
 
   softDelete(id: string) {

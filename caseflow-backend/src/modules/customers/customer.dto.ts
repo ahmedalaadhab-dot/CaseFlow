@@ -14,6 +14,14 @@ export const createCustomerSchema = z.object({
   employer: z.string().optional(),
   notes: z.string().optional(),
   profilePicture: z.string().optional(),
+  ekeyUsername: z.string().optional(),
+  ekeyPassword: z.string().optional(),
+  molUsername: z.string().optional(),
+  molPassword: z.string().optional(),
+  tamkeenUsername: z.string().optional(),
+  tamkeenPassword: z.string().optional(),
+  sioUsername: z.string().optional(),
+  sioPassword: z.string().optional(),
 });
 export type CreateCustomerDto = z.infer<typeof createCustomerSchema>;
 

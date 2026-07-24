@@ -2,8 +2,8 @@
 // or S3 directly. Swapping STORAGE_DRIVER=s3 later means implementing
 // this interface once (S3StorageProvider) — no changes anywhere else.
 export interface StorageProvider {
-  /** Persist a file buffer, returning the storage key to save on the Document row. */
-  save(params: { buffer: Buffer; originalName: string; caseId: string }): Promise<string>;
+  /** Persist a file buffer under a namespacing folder, returning the storage key to save on the owning row. */
+  save(params: { buffer: Buffer; originalName: string; folder: string }): Promise<string>;
 
   /** Retrieve a file's bytes by storage key. */
   read(storageKey: string): Promise<Buffer>;

@@ -12,6 +12,10 @@ export type CaseStatus =
 
 export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 
+export type RecurrencePeriod = "WEEKLY" | "MONTHLY" | "QUARTERLY" | "BIANNUALLY" | "ANNUALLY" | "CUSTOM";
+
+export type RecurrenceUnit = "DAYS" | "WEEKS" | "MONTHS";
+
 export type PaymentStatus = "UNPAID" | "PARTIALLY_PAID" | "PAID" | "REFUNDED";
 
 export type DocumentCategory =
@@ -69,6 +73,14 @@ export interface Customer {
   employer?: string | null;
   notes?: string | null;
   profilePicture?: string | null;
+  ekeyUsername?: string | null;
+  ekeyPassword?: string | null;
+  molUsername?: string | null;
+  molPassword?: string | null;
+  tamkeenUsername?: string | null;
+  tamkeenPassword?: string | null;
+  sioUsername?: string | null;
+  sioPassword?: string | null;
   createdAt: string;
   updatedAt: string;
   _count?: { cases: number };
@@ -133,10 +145,18 @@ export interface ServiceTemplateInput {
   stages: ServiceTemplateStageInput[];
 }
 
+export interface DocumentFolder {
+  id: string;
+  caseId: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface Document {
   id: string;
   caseId: string;
   category: DocumentCategory;
+  folderId?: string | null;
   fileName: string;
   storageKey: string;
   url: string;
@@ -201,6 +221,12 @@ export interface Case {
   customerPrice?: string | number | null;
   isArchived: boolean;
   archivedAt?: string | null;
+  isRecurring: boolean;
+  recurrencePeriod?: RecurrencePeriod | null;
+  recurrenceCustomValue?: number | null;
+  recurrenceCustomUnit?: RecurrenceUnit | null;
+  recurrenceParentId?: string | null;
+  recurrenceGeneratedAt?: string | null;
   documents?: Document[];
   tasks?: Task[];
   timelineEvents?: TimelineEvent[];

@@ -14,7 +14,7 @@ import { formatDateTime } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { RequireRole, RoleGate } from "@/routes/RoleGate";
-import { useServiceTemplates, useSetServiceTemplateActive, useDeleteServiceTemplate } from "@/hooks/useDomain";
+import { useServiceTemplates, useSetServiceTemplateActive, useDeleteServiceTemplate, useUploadOfficeLogo } from "@/hooks/useDomain";
 import { useUsers, useDeactivateUser, useReactivateUser } from "@/hooks/useUsers";
 import { ServiceTemplateFormDialog } from "@/components/settings/ServiceTemplateFormDialog";
 import { CreateUserDialog, EditUserDialog, ResetPasswordDialog } from "@/components/settings/UserFormDialog";
@@ -55,6 +55,22 @@ function OfficeInfoTab() {
   const [form, setForm] = React.useState(value);
   React.useEffect(() => setForm(value), [value]);
 
+  const uploadLogo = useUploadOfficeLogo();
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
+
+  async function handleLogoSelected(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    try {
+      await uploadLogo.mutateAsync(file);
+      toast({ title: "Logo updated", variant: "success" });
+    } catch (err) {
+      toast({ title: "Couldn't upload logo", description: getApiErrorMessage(err), variant: "destructive" });
+    } finally {
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -62,6 +78,37 @@ function OfficeInfoTab() {
         <CardDescription>Shown on printed documents and invoices.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 max-w-md">
+        <div className="space-y-1.5">
+          <Label>Logo</Label>
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-secondary/30">
+              {form.logoUrl ? (
+                <img src={form.logoUrl} alt="Office logo" className="h-full w-full object-contain" />
+              ) : (
+                <span className="text-xs text-muted-foreground">None</span>
+              )}
+            </div>
+            <div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                isLoading={uploadLogo.isPending}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                {form.logoUrl ? "Replace logo" : "Upload logo"}
+              </Button>
+              <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, WEBP or SVG</p>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,.svg"
+                className="hidden"
+                onChange={(e) => handleLogoSelected(e.target.files)}
+              />
+            </div>
+          </div>
+        </div>
         <div className="space-y-1.5">
           <Label>Office name</Label>
           <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />

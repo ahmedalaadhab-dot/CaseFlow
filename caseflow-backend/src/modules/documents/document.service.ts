@@ -14,6 +14,7 @@ export const documentService = {
   async upload(params: {
     caseId: string;
     category: string;
+    folderId?: string;
     buffer: Buffer;
     originalName: string;
     mimeType: string;
@@ -27,7 +28,7 @@ export const documentService = {
     const storageKey = await storage.save({
       buffer: params.buffer,
       originalName: params.originalName,
-      caseId: params.caseId,
+      folder: params.caseId,
     });
 
     // If a document with the same file name already exists in this case,
@@ -37,6 +38,7 @@ export const documentService = {
     const created = await documentRepository.create({
       caseId: params.caseId,
       category: params.category,
+      folderId: params.folderId,
       fileName: params.originalName,
       storageKey,
       mimeType: params.mimeType,
@@ -61,10 +63,10 @@ export const documentService = {
     return Promise.all(docs.map(async (d) => ({ ...d, url: await storage.getUrl(d.storageKey) })));
   },
 
-  async rename(id: string, fileName: string) {
+  async update(id: string, data: { fileName?: string; folderId?: string | null }) {
     const doc = await documentRepository.findById(id);
     if (!doc) throw new NotFoundError("Document");
-    return documentRepository.rename(id, fileName);
+    return documentRepository.update(id, data);
   },
 
   async remove(id: string, actorId: string) {

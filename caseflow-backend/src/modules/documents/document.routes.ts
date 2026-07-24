@@ -12,7 +12,7 @@ router.post(
   upload.single("file"),
   documentController.upload
 );
-router.patch("/:id", requireRole("MANAGER", "EMPLOYEE", "RECEPTION"), documentController.rename);
+router.patch("/:id", requireRole("MANAGER", "EMPLOYEE", "RECEPTION"), documentController.update);
 router.delete("/:id", requireRole("MANAGER", "EMPLOYEE"), documentController.remove);
 
 export default router;

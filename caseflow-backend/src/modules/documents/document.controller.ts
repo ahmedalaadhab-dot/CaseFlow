@@ -26,10 +26,12 @@ export const documentController = {
     if (!req.file) throw new ValidationError(undefined, "No file provided");
 
     const category = categorySchema.parse(req.body.category);
+    const folderId = req.body.folderId ? z.string().min(1).parse(req.body.folderId) : undefined;
 
     const created = await documentService.upload({
       caseId: req.params.caseId,
       category,
+      folderId,
       buffer: req.file.buffer,
       originalName: req.file.originalname,
       mimeType: req.file.mimetype,
@@ -40,9 +42,11 @@ export const documentController = {
     return ok(res, created, undefined, 201);
   }),
 
-  rename: asyncHandler(async (req: Request, res: Response) => {
-    const { fileName } = z.object({ fileName: z.string().min(1) }).parse(req.body);
-    const updated = await documentService.rename(req.params.id, fileName);
+  update: asyncHandler(async (req: Request, res: Response) => {
+    const dto = z
+      .object({ fileName: z.string().min(1).optional(), folderId: z.string().min(1).nullable().optional() })
+      .parse(req.body);
+    const updated = await documentService.update(req.params.id, dto);
     return ok(res, updated);
   }),
 

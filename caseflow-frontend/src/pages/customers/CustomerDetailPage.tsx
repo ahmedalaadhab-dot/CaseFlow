@@ -90,6 +90,59 @@ export default function CustomerDetailPage() {
               </div>
             )}
 
+            {(customer.ekeyUsername ||
+              customer.ekeyPassword ||
+              customer.molUsername ||
+              customer.molPassword ||
+              customer.tamkeenUsername ||
+              customer.tamkeenPassword ||
+              customer.sioUsername ||
+              customer.sioPassword) && (
+              <div className="mt-5 space-y-2 border-t border-border pt-4 text-sm">
+                <p className="text-xs font-medium uppercase text-muted-foreground">Government portal accounts</p>
+                {(customer.ekeyUsername || customer.ekeyPassword) && (
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <span className="text-muted-foreground">eKey</span>
+                    <span />
+                    <span className="text-muted-foreground">Username</span>
+                    <span className="font-tag">{customer.ekeyUsername ?? "—"}</span>
+                    <span className="text-muted-foreground">Password</span>
+                    <span className="font-tag">{customer.ekeyPassword ?? "—"}</span>
+                  </div>
+                )}
+                {(customer.molUsername || customer.molPassword) && (
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <span className="text-muted-foreground">MoL</span>
+                    <span />
+                    <span className="text-muted-foreground">Username</span>
+                    <span className="font-tag">{customer.molUsername ?? "—"}</span>
+                    <span className="text-muted-foreground">Password</span>
+                    <span className="font-tag">{customer.molPassword ?? "—"}</span>
+                  </div>
+                )}
+                {(customer.tamkeenUsername || customer.tamkeenPassword) && (
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <span className="text-muted-foreground">Tamkeen</span>
+                    <span />
+                    <span className="text-muted-foreground">Username</span>
+                    <span className="font-tag">{customer.tamkeenUsername ?? "—"}</span>
+                    <span className="text-muted-foreground">Password</span>
+                    <span className="font-tag">{customer.tamkeenPassword ?? "—"}</span>
+                  </div>
+                )}
+                {(customer.sioUsername || customer.sioPassword) && (
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <span className="text-muted-foreground">SIO</span>
+                    <span />
+                    <span className="text-muted-foreground">Username</span>
+                    <span className="font-tag">{customer.sioUsername ?? "—"}</span>
+                    <span className="text-muted-foreground">Password</span>
+                    <span className="font-tag">{customer.sioPassword ?? "—"}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <Button variant="outline" className="mt-5 w-full" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Edit profile
             </Button>

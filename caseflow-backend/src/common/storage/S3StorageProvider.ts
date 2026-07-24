@@ -38,9 +38,9 @@ export class S3StorageProvider implements StorageProvider {
     });
   }
 
-  async save({ buffer, originalName, caseId }: { buffer: Buffer; originalName: string; caseId: string }): Promise<string> {
+  async save({ buffer, originalName, folder }: { buffer: Buffer; originalName: string; folder: string }): Promise<string> {
     const ext = path.extname(originalName);
-    const key = `${caseId}/${randomUUID()}${ext}`;
+    const key = `${folder}/${randomUUID()}${ext}`;
 
     await this.client.send(
       new PutObjectCommand({

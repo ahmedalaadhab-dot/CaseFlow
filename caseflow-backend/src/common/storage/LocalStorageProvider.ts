@@ -15,12 +15,12 @@ export class LocalStorageProvider implements StorageProvider {
     await fs.mkdir(dir, { recursive: true });
   }
 
-  async save({ buffer, originalName, caseId }: { buffer: Buffer; originalName: string; caseId: string }): Promise<string> {
-    const dir = path.join(this.root, caseId);
+  async save({ buffer, originalName, folder }: { buffer: Buffer; originalName: string; folder: string }): Promise<string> {
+    const dir = path.join(this.root, folder);
     await this.ensureDir(dir);
 
     const ext = path.extname(originalName);
-    const key = path.join(caseId, `${randomUUID()}${ext}`);
+    const key = path.join(folder, `${randomUUID()}${ext}`);
     await fs.writeFile(path.join(this.root, key), buffer);
     return key.split(path.sep).join("/"); // normalize to forward slashes as the stored key
   }

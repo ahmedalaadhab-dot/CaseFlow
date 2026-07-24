@@ -6,6 +6,7 @@ import type {
   DashboardSummary,
   DashboardCharts,
   Document,
+  DocumentFolder,
   Task,
   Payment,
   SearchResults,
@@ -18,6 +19,18 @@ export function useOfficeInfo() {
     queryKey: ["settings"],
     queryFn: () => unwrap<Record<string, unknown>>(api.get("/settings")),
     select: (data) => (data?.office_info as OfficeInfo) ?? null,
+  });
+}
+
+export function useUploadOfficeLogo() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return unwrap<{ value: OfficeInfo }>(api.post("/settings/logo", form, { headers: { "Content-Type": "multipart/form-data" } }));
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["settings"] }),
   });
 }
 
@@ -96,10 +109,21 @@ export function useCaseDocuments(caseId: string | undefined) {
 export function useUploadDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ caseId, file, category }: { caseId: string; file: File; category: string }) => {
+    mutationFn: async ({
+      caseId,
+      file,
+      category,
+      folderId,
+    }: {
+      caseId: string;
+      file: File;
+      category: string;
+      folderId?: string;
+    }) => {
       const form = new FormData();
       form.append("file", file);
       form.append("category", category);
+      if (folderId) form.append("folderId", folderId);
       return unwrap<Document>(api.post(`/documents/case/${caseId}`, form, { headers: { "Content-Type": "multipart/form-data" } }));
     },
     onSuccess: (_d, vars) => {
@@ -109,11 +133,57 @@ export function useUploadDocument() {
   });
 }
 
+export function useMoveDocument() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, folderId }: { id: string; caseId: string; folderId: string | null }) =>
+      unwrap<Document>(api.patch(`/documents/${id}`, { folderId })),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["documents", vars.caseId] }),
+  });
+}
+
 export function useDeleteDocument() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id }: { id: string; caseId: string }) => api.delete(`/documents/${id}`),
     onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["documents", vars.caseId] }),
+  });
+}
+
+export function useDocumentFolders(caseId: string | undefined) {
+  return useQuery({
+    queryKey: ["document-folders", caseId],
+    queryFn: () => unwrap<DocumentFolder[]>(api.get(`/document-folders/case/${caseId}`)),
+    enabled: !!caseId,
+  });
+}
+
+export function useCreateDocumentFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ caseId, name }: { caseId: string; name: string }) =>
+      unwrap<DocumentFolder>(api.post(`/document-folders/case/${caseId}`, { name })),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["document-folders", vars.caseId] }),
+  });
+}
+
+export function useRenameDocumentFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; caseId: string; name: string }) =>
+      unwrap<DocumentFolder>(api.patch(`/document-folders/${id}`, { name })),
+    onSuccess: (_d, vars) => qc.invalidateQueries({ queryKey: ["document-folders", vars.caseId] }),
+  });
+}
+
+export function useDeleteDocumentFolder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: string; caseId: string }) => api.delete(`/document-folders/${id}`),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ["document-folders", vars.caseId] });
+      qc.invalidateQueries({ queryKey: ["documents", vars.caseId] });
+    },
   });
 }
 

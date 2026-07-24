@@ -30,6 +30,14 @@ const schema = z.object({
   address: z.string().optional(),
   employer: z.string().optional(),
   notes: z.string().optional(),
+  ekeyUsername: z.string().optional(),
+  ekeyPassword: z.string().optional(),
+  molUsername: z.string().optional(),
+  molPassword: z.string().optional(),
+  tamkeenUsername: z.string().optional(),
+  tamkeenPassword: z.string().optional(),
+  sioUsername: z.string().optional(),
+  sioPassword: z.string().optional(),
 });
 type Form = z.infer<typeof schema>;
 
@@ -71,6 +79,14 @@ export function CustomerFormDialog({
         address: customer?.address ?? "",
         employer: customer?.employer ?? "",
         notes: customer?.notes ?? "",
+        ekeyUsername: customer?.ekeyUsername ?? "",
+        ekeyPassword: customer?.ekeyPassword ?? "",
+        molUsername: customer?.molUsername ?? "",
+        molPassword: customer?.molPassword ?? "",
+        tamkeenUsername: customer?.tamkeenUsername ?? "",
+        tamkeenPassword: customer?.tamkeenPassword ?? "",
+        sioUsername: customer?.sioUsername ?? "",
+        sioPassword: customer?.sioPassword ?? "",
       });
     }
   }, [open, customer, reset]);
@@ -145,6 +161,44 @@ export function CustomerFormDialog({
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" {...register("notes")} />
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <p className="text-sm font-medium">Government portal accounts</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ekeyUsername">eKey username</Label>
+                <Input id="ekeyUsername" {...register("ekeyUsername")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ekeyPassword">eKey password</Label>
+                <Input id="ekeyPassword" {...register("ekeyPassword")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="molUsername">MoL account username</Label>
+                <Input id="molUsername" {...register("molUsername")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="molPassword">MoL account password</Label>
+                <Input id="molPassword" {...register("molPassword")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tamkeenUsername">Tamkeen account username</Label>
+                <Input id="tamkeenUsername" {...register("tamkeenUsername")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tamkeenPassword">Tamkeen account password</Label>
+                <Input id="tamkeenPassword" {...register("tamkeenPassword")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sioUsername">SIO account username</Label>
+                <Input id="sioUsername" {...register("sioUsername")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="sioPassword">SIO account password</Label>
+                <Input id="sioPassword" {...register("sioPassword")} />
+              </div>
             </div>
           </div>
 

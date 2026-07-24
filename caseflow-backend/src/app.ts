@@ -11,6 +11,7 @@ import customerRoutes from "./modules/customers/customer.routes";
 import caseRoutes from "./modules/cases/case.routes";
 import serviceTemplateRoutes from "./modules/service-templates/service-template.routes";
 import documentRoutes from "./modules/documents/document.routes";
+import documentFolderRoutes from "./modules/documents/document-folder.routes";
 import taskRoutes from "./modules/tasks/task.routes";
 import paymentRoutes from "./modules/payments/payment.routes";
 import dashboardRoutes from "./modules/dashboard/dashboard.routes";
@@ -53,6 +54,7 @@ export function createApp() {
   app.use("/api/cases", caseRoutes);
   app.use("/api/service-templates", serviceTemplateRoutes);
   app.use("/api/documents", documentRoutes);
+  app.use("/api/document-folders", documentFolderRoutes);
   app.use("/api/tasks", taskRoutes);
   app.use("/api/payments", paymentRoutes);
   app.use("/api/dashboard", dashboardRoutes);
